@@ -75,6 +75,7 @@ class RegisterNMS(object):
         score_thresh: float = 0.25,
         nms_thresh: float = 0.45,
         detections_per_img: int = 100,
+        legacy_nms: bool = False,
     ):
         """
         Register the ``EfficientNMS_TRT`` plugin node.
@@ -89,18 +90,6 @@ class RegisterNMS(object):
         """
 
         self.infer()
-        # Find the concat node at the end of the network
-        op_inputs = self.graph.outputs
-        op = "EfficientNMS_TRT"
-        attrs = {
-            "plugin_version": "1",
-            "background_class": -1,  # no background class
-            "max_output_boxes": detections_per_img,
-            "score_threshold": score_thresh,
-            "iou_threshold": nms_thresh,
-            "score_activation": False,
-            "box_coding": 0,
-        }
 
         if self.precision == "fp32":
             dtype_output = np.float32
@@ -109,29 +98,86 @@ class RegisterNMS(object):
         else:
             raise NotImplementedError(f"Currently not supports precision: {self.precision}")
 
-        # NMS Outputs
-        output_num_detections = gs.Variable(
-            name="num_dets",
-            dtype=np.int32,
-            shape=[self.batch_size, 1],
-        )  # A scalar indicating the number of valid detections per batch image.
-        output_boxes = gs.Variable(
-            name="det_boxes",
-            dtype=dtype_output,
-            shape=[self.batch_size, detections_per_img, 4],
-        )
-        output_scores = gs.Variable(
-            name="det_scores",
-            dtype=dtype_output,
-            shape=[self.batch_size, detections_per_img],
-        )
-        output_labels = gs.Variable(
-            name="det_classes",
-            dtype=np.int32,
-            shape=[self.batch_size, detections_per_img],
-        )
+        if legacy_nms:
+            boxes, classes = self.graph.outputs
+            op_inputs = [boxes, classes]
+            op = "BatchedNMSDynamic_TRT"
+            attrs = {
+                'plugin_version': "1",
+                'shareLocation': True,
+                'backgroundLabelId': -1,
+                'numClasses': 80,
+                'topK': 100,
+                'keepTopK': detections_per_img,
+                'scoreThreshold': score_thresh,
+                'iouThreshold': nms_thresh,
+                'isNormalized': False,
+                'clipBoxes': False,
+                'scoreBits': 10, # Some versions of the plugin may need this parameter. If so, uncomment this line.
+            }
 
-        op_outputs = [output_num_detections, output_boxes, output_scores, output_labels]
+            # NMS Outputs
+            output_num_detections = gs.Variable(
+                name="num_dets",
+                dtype=np.int32,
+                shape=[self.batch_size, 1],
+            )  # A scalar indicating the number of valid detections per batch image.
+            output_boxes = gs.Variable(
+                name="det_boxes",
+                dtype=dtype_output,
+                shape=[self.batch_size, detections_per_img, 4],
+            )
+            output_scores = gs.Variable(
+                name="det_scores",
+                dtype=dtype_output,
+                shape=[self.batch_size, detections_per_img],
+            )
+            output_labels = gs.Variable(
+                name="det_classes_fp",
+                dtype=dtype_output,
+                shape=[self.batch_size, detections_per_img],
+            )
+
+            op_outputs = [output_num_detections, output_boxes, output_scores, output_labels]
+
+        else:
+            # Find the concat node at the end of the network
+            op_inputs = self.graph.outputs
+            op = "EfficientNMS_TRT"
+            attrs = {
+                "plugin_version": "1",
+                "background_class": -1,  # no background class
+                "max_output_boxes": detections_per_img,
+                "score_threshold": score_thresh,
+                "iou_threshold": nms_thresh,
+                "score_activation": False,
+                "box_coding": 0,
+            }
+
+            # NMS Outputs
+            output_num_detections = gs.Variable(
+                name="num_dets",
+                dtype=np.int32,
+                shape=[self.batch_size, 1],
+            )  # A scalar indicating the number of valid detections per batch image.
+            output_boxes = gs.Variable(
+                name="det_boxes",
+                dtype=dtype_output,
+                shape=[self.batch_size, detections_per_img, 4],
+            )
+            output_scores = gs.Variable(
+                name="det_scores",
+                dtype=dtype_output,
+                shape=[self.batch_size, detections_per_img],
+            )
+            output_labels = gs.Variable(
+                name="det_classes",
+                dtype=np.int32,
+                shape=[self.batch_size, detections_per_img],
+            )
+
+            op_outputs = [output_num_detections, output_boxes, output_scores, output_labels]
+
 
         # Create the NMS Plugin node with the selected inputs. The outputs of the node will also
         # become the final outputs of the graph.

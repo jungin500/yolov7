@@ -34,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--include-nms', action='store_true', help='export end2end onnx')
     parser.add_argument('--fp16', action='store_true', help='CoreML FP16 half-precision export')
     parser.add_argument('--int8', action='store_true', help='CoreML INT8 quantization')
+    parser.add_argument('--legacy-nms', action='store_true', help='use TRT legacy nms for onnx model')
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     opt.dynamic = opt.dynamic and not opt.end2end
@@ -68,6 +69,8 @@ if __name__ == '__main__':
     y = model(img)  # dry run
     if opt.include_nms:
         model.model[-1].include_nms = True
+        if opt.legacy_nms:
+            model.model[-1].legacy_nms = True
         y = None
 
     # TorchScript export
@@ -120,7 +123,7 @@ if __name__ == '__main__':
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         f = opt.weights.replace('.pt', '.onnx')  # filename
         model.eval()
-        output_names = ['classes', 'boxes'] if y is None else ['output']
+        output_names = ['boxes', 'classes'] if y is None else ['output']
         dynamic_axes = None
         if opt.dynamic:
             dynamic_axes = {'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
@@ -194,8 +197,8 @@ if __name__ == '__main__':
 
         if opt.include_nms:
             print('Registering NMS plugin for ONNX...')
-            mo = RegisterNMS(f)
-            mo.register_nms()
+            mo = RegisterNMS(f, precision="fp16" if opt.fp16 else "fp32")
+            mo.register_nms(legacy_nms=opt.legacy_nms)
             mo.save(f)
 
     except Exception as e:

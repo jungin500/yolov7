@@ -25,6 +25,7 @@ class Detect(nn.Module):
     export = False  # onnx export
     end2end = False
     include_nms = False
+    legacy_nms = False
     concat = False
 
     def __init__(self, nc=80, anchors=(), ch=()):  # detection layer
@@ -68,6 +69,9 @@ class Detect(nn.Module):
             out = torch.cat(z, 1)
         elif self.include_nms:
             z = self.convert(z)
+            if self.legacy_nms:
+                (box, score) = z
+                z = (box.unsqueeze(2), score)
             out = (z, )
         elif self.concat:
             out = torch.cat(z, 1)
