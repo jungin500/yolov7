@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 import warnings
+import os
 
 sys.path.append('./')  # to run '$ python *.py' files in subdirectories
 
@@ -76,7 +77,7 @@ if __name__ == '__main__':
     # TorchScript export
     try:
         print('\nStarting TorchScript export with torch %s...' % torch.__version__)
-        f = opt.weights.replace('.pt', '.torchscript.pt')  # filename
+        f = os.path.splitext(opt.weights)[0] + '.torchscript.pt'  # filename
         ts = torch.jit.trace(model, img, strict=False)
         ts.save(f)
         print('TorchScript export success, saved as %s' % f)
@@ -99,7 +100,7 @@ if __name__ == '__main__':
             else:
                 print('quantization only supported on macOS, skipping...')
 
-        f = opt.weights.replace('.pt', '.mlmodel')  # filename
+        f = os.path.splitext(opt.weights)[0] + '.mlmodel'  # filename
         ct_model.save(f)
         print('CoreML export success, saved as %s' % f)
     except Exception as e:
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     # TorchScript-Lite export
     try:
         print('\nStarting TorchScript-Lite export with torch %s...' % torch.__version__)
-        f = opt.weights.replace('.pt', '.torchscript.ptl')  # filename
+        f = os.path.splitext(opt.weights)[0] + '.torchscript.ptl'  # filename
         tsl = torch.jit.trace(model, img, strict=False)
         tsl = optimize_for_mobile(tsl)
         tsl._save_for_lite_interpreter(f)
@@ -121,7 +122,7 @@ if __name__ == '__main__':
         import onnx
 
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
-        f = opt.weights.replace('.pt', '.onnx')  # filename
+        f = os.path.splitext(opt.weights)[0] + '.onnx'  # filename
         model.eval()
         output_names = ['boxes', 'classes'] if y is None else ['output']
         dynamic_axes = None
