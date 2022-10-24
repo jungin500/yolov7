@@ -75,6 +75,7 @@ class RegisterNMS(object):
         score_thresh: float = 0.25,
         nms_thresh: float = 0.45,
         detections_per_img: int = 100,
+        num_classes: int = 80,
         legacy_nms: bool = False,
     ):
         """
@@ -106,7 +107,7 @@ class RegisterNMS(object):
                 'plugin_version': "1",
                 'shareLocation': True,
                 'backgroundLabelId': -1,
-                'numClasses': 80,
+                'numClasses': num_classes,
                 'topK': 100,
                 'keepTopK': detections_per_img,
                 'scoreThreshold': score_thresh,

@@ -199,7 +199,7 @@ if __name__ == '__main__':
         if opt.include_nms:
             print('Registering NMS plugin for ONNX...')
             mo = RegisterNMS(f, precision="fp16" if opt.fp16 else "fp32")
-            mo.register_nms(legacy_nms=opt.legacy_nms)
+            mo.register_nms(legacy_nms=opt.legacy_nms, num_classes=model.nc)
             mo.save(f)
 
     except Exception as e:
